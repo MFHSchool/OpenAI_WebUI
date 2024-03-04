@@ -9,6 +9,7 @@ import extra_streamlit_components as stx
 from OpenAI_GPT import OAI_GPT
 from OpenAI_DallE import OAI_DallE
 
+import sys
 import re
 import os.path
 
