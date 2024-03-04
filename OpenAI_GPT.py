@@ -92,9 +92,15 @@ class OAI_GPT:
             },
             "gpt-4-1106-preview":
             {
-                "label": "The latest GPT-4 model (with 128k tokens) with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more. Returns a maximum of 4,096 output tokens. This preview model is not yet suited for production traffic.",
+                "label": "GPT-4 Turbo model featuring improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more. Returns a maximum of 4,096 output tokens. This is a preview model.",
                 "max_token": 4096,
                 "data": "Up to Apr 2023 (as of 20231108)"
+            },
+            "gpt-4-turbo-preview":
+            {
+                "label": "The latest GPT-4 model (with 128k tokens) with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more. Returns a maximum of 4,096 output tokens. This preview model is not yet suited for production traffic.",
+                "max_token": 4096,
+                "data": "Up to Dec 2023 (as of 20240304)"
             }
         }
 
