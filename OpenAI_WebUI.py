@@ -39,6 +39,7 @@ def main():
     save_location = ""
     if 'OAIWUI_SAVEDIR' in os.environ:
         save_location = os.environ.get('OAIWUI_SAVEDIR')
+        save_location = os.path.dirname(os.path.realpath(sys.path[0]) + "\" + os.environ.get('OAIWUI_SAVEDIR')
     if cf.isBlank(save_location):
         st.error(f"Could not find the OAIWUI_SAVEDIR environment variable")
         cf.error_exit("Could not find the OAIWUI_SAVEDIR environment variable")
