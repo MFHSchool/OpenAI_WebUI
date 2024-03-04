@@ -22,7 +22,7 @@ from datetime import datetime
 iti_version="0.9.2"
 st.set_page_config(page_title=f"OpenAI API WebUI ({iti_version})", page_icon="🫥", layout="wide", initial_sidebar_state="expanded", menu_items={'Get Help': 'https://github.com/Infotrend-Inc/OpenAI_WebUI', 'About': f"# OpenAI WebUI ({iti_version})\n Brought to you by [Infotrend Inc.](https://www.infotrend.com/)"})
 
-st.markdown(r"""[data-testid="stStatusWidget"] {
+st.markdown(r"""[data-testid="stStatusWidget"], [data-testid="stToolbarActions"] {
     visibility: hidden;
 }""",
     unsafe_allow_html=True)
