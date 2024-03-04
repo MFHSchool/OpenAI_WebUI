@@ -40,12 +40,10 @@ def main():
     save_location = ""
     if 'OAIWUI_SAVEDIR' in os.environ:
         save_location = os.environ.get('OAIWUI_SAVEDIR')
-        save_location = os.path.join(os.path.dirname(os.path.realpath(sys.path[0])), os.environ.get('OAIWUI_SAVEDIR'))
     if cf.isBlank(save_location):
         st.error(f"Could not find the OAIWUI_SAVEDIR environment variable")
         cf.error_exit("Could not find the OAIWUI_SAVEDIR environment variable")
-    st.error(f"OAIWUI_SAVEDIR: {save_location}")
-    st.error(f"Path: {os.path.dirname(os.path.realpath(sys.path[0]))}")
+    save_location = os.path.join(os.path.dirname(os.path.realpath(sys.path[0])), save_location)
     err = cf.check_existing_dir_w(save_location, "OAIWUI_SAVEDIR directory")
     if cf.isNotBlank(err):
         st.error(f"While ching OAIWUI_SAVEDIR: {err}")
