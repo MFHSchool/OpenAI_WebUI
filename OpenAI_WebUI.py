@@ -6,10 +6,14 @@
 
 import streamlit as st
 import extra_streamlit_components as stx
+
 from OpenAI_GPT import OAI_GPT
 from OpenAI_DallE import OAI_DallE
 
 import sys
+from OpenAI_GPT_WUI import OAI_GPT_WUI
+from OpenAI_DallE_WUI import OAI_DallE_WUI
+
 import re
 import os.path
 
@@ -18,8 +22,11 @@ import common_functions as cf
 from dotenv import load_dotenv
 from datetime import datetime
 
+import hmac
+
 #####
-iti_version="0.9.2"
+iti_version=cf.iti_version
+
 st.set_page_config(page_title=f"OpenAI API WebUI ({iti_version})", page_icon="🫥", layout="wide", initial_sidebar_state="expanded", menu_items={'Get Help': 'https://github.com/Infotrend-Inc/OpenAI_WebUI', 'About': f"# OpenAI WebUI ({iti_version})\n Brought to you by [Infotrend Inc.](https://www.infotrend.com/)"})
 
 st.markdown(r"""<style>
@@ -29,7 +36,66 @@ st.markdown(r"""<style>
     unsafe_allow_html=True)
 
 #####
+def load_models():
+    err = cf.check_file_r("models.json", "models.json")
+    if cf.isNotBlank(err):
+        st.error(f"While checking models.json: {err}")
+        cf.error_exit(f"While checking models.json: {err}")
+    all_models = cf.read_json("models.json")
+    if all_models is None:
+        st.error(f"Could not read models.json")
+        cf.error_exit(f"Could not read models.json")
+    gpt_models = {}
+    if 'GPT' in all_models:
+        gpt_models = all_models['GPT']
+    else:
+        st.error(f"Could not find GPT in models.json")
+        cf.error_exit(f"Could not find GPT in models.json")
+    dalle_models = {}
+    if 'DallE' in all_models:
+        dalle_models = all_models['DallE']
+    else:
+        st.error(f"Could not find DallE in models.json")
+        cf.error_exit(f"Could not find DallE in models.json")
+    return gpt_models, dalle_models
+
+#####
+# https://docs.streamlit.io/knowledge-base/deploy/authentication-without-sso
+def check_password():
+    """Returns `True` if the user had the correct password."""
+
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if hmac.compare_digest(st.session_state["password"], st.secrets["password"]):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Don't store the password.
+        else:
+            st.session_state["password_correct"] = False
+
+    # Return True if the password is validated.
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # Show input for password.
+    st.text_input(
+        "WebUI Required Password", type="password", on_change=password_entered, key="password"
+    )
+    if "password_correct" in st.session_state:
+        st.error("😕 Password incorrect")
+    return False
+
+
+#####
 def main():
+    # Load all supported models (need the status field to decide or prompt if we can use that model or not)
+    av_gpt_models, av_dalle_models = load_models()    
+
+    err = cf.check_file_r(".streamlit/secrets.toml", "Secrets file")
+    if cf.isBlank(err):
+        if not check_password():
+            st.error("Required password incorrect, can not continue")
+            st.stop()
+
     err = cf.check_file_r(".env", "Environment file")
     if cf.isBlank(err):
         load_dotenv()
@@ -51,7 +117,7 @@ def main():
     save_location = os.path.join(os.path.dirname(os.path.realpath(sys.path[0])), save_location)
     err = cf.check_existing_dir_w(save_location, "OAIWUI_SAVEDIR directory")
     if cf.isNotBlank(err):
-        st.error(f"While ching OAIWUI_SAVEDIR: {err}")
+        st.error(f"While checking OAIWUI_SAVEDIR: {err}")
         cf.error_exit(f"{err}")
 
     gpt_models = ""
@@ -63,6 +129,17 @@ def main():
     if cf.isBlank(gpt_models):
         st.error(f"OAIWUI_GPT_MODELS environment variable is empty")
         cf.error_exit("OAIWUI_GPT_MODELS environment variable is empty")
+
+    gpt_vision = True
+    if 'OAIWUI_GPT_VISION' in os.environ:
+        tmp = os.environ.get('OAIWUI_GPT_VISION')
+        if tmp.lower() == "false":
+            gpt_vision = False
+        elif tmp.lower() == "true" :
+            gpt_vision = True
+        else:
+            st.error(f"OAIWUI_GPT_VISION environment variable must be set to 'True' or 'False'")
+            cf.error_exit("OAIWUI_GPT_VISION environment variable must be set to 'True' or 'False'")
 
     dalle_models = ""
     if 'OAIWUI_DALLE_MODELS' in os.environ:
@@ -111,40 +188,55 @@ def main():
                     st.rerun()
     else:
         cf.make_wdir_error(os.path.join(save_location))
-        cf.make_wdir_error(os.path.join(save_location, iti_version))
-        long_save_location = os.path.join(save_location, iti_version, username)
+        long_save_location = os.path.join(save_location, iti_version)
         cf.make_wdir_error(os.path.join(long_save_location))
-        cf.make_wdir_error(os.path.join(long_save_location, "dalle"))
-        cf.make_wdir_error(os.path.join(long_save_location, "gpt"))
 
-        set_ui(long_save_location, apikey, gpt_models, dalle_models)
+        set_ui(long_save_location, username, apikey, gpt_models, av_gpt_models, gpt_vision, dalle_models, av_dalle_models)
+
+#####
+
+def process_error_warning(err, warn):
+    if cf.isNotBlank(err):
+        st.error(err)
+        cf.error_exit(err)
+    if cf.isNotBlank(warn):
+        st.warning(warn)
 
 
 #####
-def set_ui(long_save_location, apikey, gpt_models, dalle_models):
-    oai_gpt = OAI_GPT(apikey, long_save_location, gpt_models)
+
+def set_ui(long_save_location, username, apikey, gpt_models, av_gpt_models, gpt_vision, dalle_models, av_dalle_models):
+    oai_gpt = OAI_GPT(apikey, long_save_location, username)
+    err, warn = oai_gpt.set_parameters(gpt_models, av_gpt_models)
+    process_error_warning(err, warn)
+    oai_gpt_st = OAI_GPT_WUI(oai_gpt, gpt_vision)
     oai_dalle = None
+    oai_dalle_st = None
     if 'OAIWUI_GPT_ONLY' in os.environ:
         tmp = os.environ.get('OAIWUI_GPT_ONLY')
-        if tmp == "True":
+        if tmp.lower() == "true":
             oai_dalle = None
-        elif tmp == "False":
-            oai_dalle = OAI_DallE(apikey, long_save_location, dalle_models)
+        elif tmp.lower() == "false":
+            oai_dalle = OAI_DallE(apikey, long_save_location, username)
+            err, warn = oai_dalle.set_parameters(dalle_models, av_dalle_models)
+            process_error_warning(err, warn)
+            oai_dalle_st = OAI_DallE_WUI(oai_dalle)
+#            dalle_process_error_warning_info(oai_dalle)
         else:
             st.error(f"OAIWUI_GPT_ONLY environment variable must be set to 'True' or 'False'")
             cf.error_exit("OAIWUI_GPT_ONLY environment variable must be set to 'True' or 'False'")
 
     if oai_dalle is None:
-        oai_gpt.set_ui()
+        oai_gpt_st.set_ui()
     else:
         chosen_id = stx.tab_bar(data=[
             stx.TabBarItemData(id="gpt_tab", title="GPT", description="Text generation using OpenAI's GPT"),
             stx.TabBarItemData(id="dalle_tab", title="Dall-E", description="Image generation using OpenAI's Dall-E")
             ])
         if chosen_id == "dalle_tab":
-            oai_dalle.set_ui()
+            oai_dalle_st.set_ui()
         else:
-            oai_gpt.set_ui()
+            oai_gpt_st.set_ui()
 
 
 #####
